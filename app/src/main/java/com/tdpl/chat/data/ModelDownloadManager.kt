@@ -81,6 +81,16 @@ class ModelDownloadManager(private val context: Context) {
     /** True if a usable model is already on disk (internal) without touching the network. */
     fun hasLocalModel(): Boolean = modelFile.exists() && versionFile.exists()
 
+    /**
+     * Marks the model Ready using only what's already on internal storage —
+     * makes zero network calls. Use this on every normal app launch when
+     * hasLocalModel() is true, so the app opens fully offline and only ever
+     * touches the network on first setup or if the internal copy is missing.
+     */
+    fun markLocalModelReady() {
+        _state.value = ModelState.Ready
+    }
+
     suspend fun ensureModelReady(manifestUrl: String, variant: String? = null): Boolean =
         withContext(Dispatchers.IO) {
             try {

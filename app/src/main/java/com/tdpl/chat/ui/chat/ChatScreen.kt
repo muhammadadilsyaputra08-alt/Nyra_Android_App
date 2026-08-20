@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +32,8 @@ fun ChatScreen(
     messages: List<Message>,
     isGenerating: Boolean,
     onSend: (String) -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    onMenuClick: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -46,7 +48,7 @@ fun ChatScreen(
             .fillMaxSize()
             .background(InkVoid)
     ) {
-        TopBar()
+        TopBar(onMenuClick = onMenuClick)
 
         LazyColumn(
             state = listState,
@@ -80,14 +82,17 @@ fun ChatScreen(
 }
 
 @Composable
-private fun TopBar() {
+private fun TopBar(onMenuClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(InkSurfaceRaised, InkVoid)))
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(onClick = onMenuClick) {
+            Icon(Icons.Filled.Menu, contentDescription = "Riwayat percakapan", tint = TextSecondary)
+        }
         Box(
             modifier = Modifier
                 .size(10.dp)
@@ -97,7 +102,7 @@ private fun TopBar() {
         Spacer(Modifier.width(10.dp))
         Text("Nyra", style = MaterialTheme.typography.titleLarge, color = TextPrimary)
         Spacer(Modifier.weight(1f))
-        Text("on-device", style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+        Text("on-device", style = MaterialTheme.typography.labelSmall, color = TextTertiary, modifier = Modifier.padding(end = 12.dp))
     }
 }
 

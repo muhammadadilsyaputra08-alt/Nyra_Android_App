@@ -1,5 +1,8 @@
 package com.tdpl.chat.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Message(
     val id: Long = System.nanoTime(),
     val role: Role,
@@ -8,4 +11,5 @@ data class Message(
     val timestampMs: Long = System.currentTimeMillis()
 )
 
+@Serializable
 enum class Role { USER, ASSISTANT, SYSTEM }
