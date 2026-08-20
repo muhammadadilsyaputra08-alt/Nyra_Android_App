@@ -1,0 +1,2 @@
+-keep class com.tdpl.chat.jni.** { *; }
+-keepclasseswithmembernames class * { native <methods>; }
