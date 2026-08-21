@@ -13,6 +13,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import com.tdpl.chat.data.ModelState
+import com.tdpl.chat.ui.character.CharacterEditorScreen
+import com.tdpl.chat.ui.character.CharacterListScreen
 import com.tdpl.chat.ui.chat.ChatScreen
 import com.tdpl.chat.ui.chat.SessionSidebar
 import com.tdpl.chat.ui.download.DownloadScreen
@@ -38,6 +40,9 @@ class MainActivity : ComponentActivity() {
                 val isGenerating by viewModel.isGenerating.collectAsState()
                 val sessions by viewModel.sessions.collectAsState()
                 val currentSessionId by viewModel.currentSessionId.collectAsState()
+                val characters by viewModel.characters.collectAsState()
+                val screen by viewModel.screen.collectAsState()
+                val characterName by viewModel.currentCharacterName.collectAsState()
 
                 if (modelState is ModelState.Ready && loadedInMemory) {
                     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -49,9 +54,10 @@ class MainActivity : ComponentActivity() {
                             ModalDrawerSheet(drawerContainerColor = InkSurface) {
                                 SessionSidebar(
                                     sessions = sessions,
+                                    characters = characters,
                                     currentSessionId = currentSessionId,
                                     onNewChat = {
-                                        viewModel.newChat()
+                                        viewModel.openCharacterList()
                                         scope.launch { drawerState.close() }
                                     },
                                     onSelect = {
@@ -65,13 +71,31 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     ) {
-                        ChatScreen(
-                            messages = messages,
-                            isGenerating = isGenerating,
-                            onSend = viewModel::sendMessage,
-                            onStop = viewModel::stopGenerating,
-                            onMenuClick = { scope.launch { drawerState.open() } }
-                        )
+                        when (val s = screen) {
+                            is Screen.CharacterList -> CharacterListScreen(
+                                characters = characters,
+                                onMenuClick = { scope.launch { drawerState.open() } },
+                                onCreateNew = { viewModel.openCharacterEditor(null) },
+                                onSelect = { viewModel.startSessionWithCharacter(it) },
+                                onEdit = { viewModel.openCharacterEditor(it) },
+                                onDelete = { viewModel.deleteCharacter(it) }
+                            )
+
+                            is Screen.CharacterEditor -> CharacterEditorScreen(
+                                existing = characters.find { it.id == s.characterId },
+                                onBack = { viewModel.openCharacterList() },
+                                onSave = { viewModel.saveCharacter(it) }
+                            )
+
+                            is Screen.Chat -> ChatScreen(
+                                messages = messages,
+                                characterName = characterName,
+                                isGenerating = isGenerating,
+                                onSend = viewModel::sendMessage,
+                                onStop = viewModel::stopGenerating,
+                                onMenuClick = { scope.launch { drawerState.open() } }
+                            )
+                        }
                     }
                 } else {
                     DownloadScreen(state = modelState)

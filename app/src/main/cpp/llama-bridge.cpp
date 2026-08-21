@@ -89,6 +89,16 @@ Java_com_tdpl_chat_jni_LlamaBridge_nativeGenerate(
     }
     g_cancel.store(false);
 
+    // Each call resends the ENTIRE conversation from scratch (see
+    // ChatViewModel.buildPrompt — it's stateless per turn, not incremental),
+    // but g_ctx is reused across calls to keep the model resident in memory.
+    // Without clearing the memory/KV cache here, the second turn's tokens
+    // collide with position/KV-cache entries left over from the first turn's
+    // decode, causing llama_decode to fail silently — the exact "first reply
+    // works, every reply after is empty" symptom.
+    llama_memory_t mem = llama_get_memory(g_ctx);
+    llama_memory_clear(mem, true);
+
     const char *promptChars = env->GetStringUTFChars(jPrompt, nullptr);
     std::string prompt(promptChars);
     env->ReleaseStringUTFChars(jPrompt, promptChars);

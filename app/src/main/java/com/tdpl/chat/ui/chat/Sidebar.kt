@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.tdpl.chat.model.Character
 import com.tdpl.chat.model.ChatSession
 import com.tdpl.chat.ui.theme.*
 
@@ -27,6 +28,7 @@ private enum class RowAction { PIN, RENAME, DELETE }
 @Composable
 fun SessionSidebar(
     sessions: List<ChatSession>,
+    characters: List<Character>,
     currentSessionId: String,
     onNewChat: () -> Unit,
     onSelect: (String) -> Unit,
@@ -36,6 +38,9 @@ fun SessionSidebar(
 ) {
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
+
+    fun characterNameFor(session: ChatSession): String? =
+        characters.find { it.id == session.characterId }?.name
 
     Column(
         modifier = Modifier
@@ -81,6 +86,7 @@ fun SessionSidebar(
                 items(pinned, key = { it.id }) { s ->
                     SessionRow(
                         session = s,
+                        subtitle = characterNameFor(s),
                         selected = s.id == currentSessionId,
                         onClick = { onSelect(s.id) },
                         onMenuAction = { action ->
@@ -98,6 +104,7 @@ fun SessionSidebar(
                 items(others, key = { it.id }) { s ->
                     SessionRow(
                         session = s,
+                        subtitle = characterNameFor(s),
                         selected = s.id == currentSessionId,
                         onClick = { onSelect(s.id) },
                         onMenuAction = { action ->
@@ -159,6 +166,7 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun SessionRow(
     session: ChatSession,
+    subtitle: String?,
     selected: Boolean,
     onClick: () -> Unit,
     onMenuAction: (RowAction) -> Unit
@@ -174,13 +182,22 @@ private fun SessionRow(
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            session.title,
-            color = if (selected) TextPrimary else TextSecondary,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                session.title,
+                color = if (selected) TextPrimary else TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    color = TextTertiary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+        }
         Box {
             IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
                 Icon(
@@ -193,7 +210,7 @@ private fun SessionRow(
             DropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false },
-                containerColor = InkSurfaceRaised
+                modifier = Modifier.background(InkSurfaceRaised)
             ) {
                 DropdownMenuItem(
                     text = { Text(if (session.pinned) "Lepas sematan" else "Sematkan", color = TextPrimary) },

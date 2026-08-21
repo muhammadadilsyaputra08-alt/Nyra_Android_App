@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatScreen(
     messages: List<Message>,
+    characterName: String,
     isGenerating: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
@@ -39,8 +40,13 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     var input by remember { mutableStateOf("") }
 
-    LaunchedEffect(messages.size, messages.lastOrNull()?.text) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    // The character's system prompt (Role.SYSTEM) is sent to the model on
+    // every turn but is never shown in the transcript — spec: "tidak
+    // ditampilkan di UI chat".
+    val visibleMessages = messages.filter { it.role != Role.SYSTEM }
+
+    LaunchedEffect(visibleMessages.size, visibleMessages.lastOrNull()?.text) {
+        if (visibleMessages.isNotEmpty()) listState.animateScrollToItem(visibleMessages.size - 1)
     }
 
     Column(
@@ -48,7 +54,7 @@ fun ChatScreen(
             .fillMaxSize()
             .background(InkVoid)
     ) {
-        TopBar(onMenuClick = onMenuClick)
+        TopBar(title = characterName, onMenuClick = onMenuClick)
 
         LazyColumn(
             state = listState,
@@ -56,11 +62,11 @@ fun ChatScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            itemsIndexed(messages, key = { _, m -> m.id }) { _, msg ->
+            itemsIndexed(visibleMessages, key = { _, m -> m.id }) { _, msg ->
                 when (msg.role) {
-                    Role.SYSTEM -> SystemNote(msg.text)
                     Role.USER -> UserBubble(msg.text)
                     Role.ASSISTANT -> AssistantBubble(msg.text, msg.isStreaming)
+                    Role.SYSTEM -> Unit
                 }
             }
         }
@@ -82,7 +88,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun TopBar(onMenuClick: () -> Unit) {
+private fun TopBar(title: String, onMenuClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -100,24 +106,9 @@ private fun TopBar(onMenuClick: () -> Unit) {
                 .background(EmberCore)
         )
         Spacer(Modifier.width(10.dp))
-        Text("Nyra", style = MaterialTheme.typography.titleLarge, color = TextPrimary)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = TextPrimary, maxLines = 1)
         Spacer(Modifier.weight(1f))
         Text("on-device", style = MaterialTheme.typography.labelSmall, color = TextTertiary, modifier = Modifier.padding(end = 12.dp))
-    }
-}
-
-@Composable
-private fun SystemNote(text: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(InkSurface)
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        )
     }
 }
 

@@ -1,14 +1,24 @@
 package com.tdpl.chat.jni
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 
 /**
  * Thin Kotlin wrapper around llama.cpp (see src/main/cpp/llama-bridge.cpp).
  * A single native context is held for the process lifetime once loaded, so the
  * model stays resident across screen navigation — no reload / no app restart
  * needed after the first successful load.
+ *
+ * IMPORTANT: every native call here is a long-running, blocking JNI call
+ * (model load can take seconds, generation can take many seconds). Both
+ * loadModel() and generateStream() are pinned to Dispatchers.Default so they
+ * never run on the caller's dispatcher directly — if a caller launches on
+ * Dispatchers.Main (e.g. viewModelScope.launch default), calling these
+ * without that protection blocks the UI thread and triggers an ANR/crash.
  */
 object LlamaBridge {
 
@@ -36,11 +46,12 @@ object LlamaBridge {
         fun onToken(token: String): Boolean
     }
 
-    suspend fun loadModel(modelPath: String, nThreads: Int = 4, nCtx: Int = 2048): Boolean {
-        val ok = nativeLoadModel(modelPath, nThreads, nCtx)
-        isLoaded = ok
-        return ok
-    }
+    suspend fun loadModel(modelPath: String, nThreads: Int = 4, nCtx: Int = 2048): Boolean =
+        withContext(Dispatchers.Default) {
+            val ok = nativeLoadModel(modelPath, nThreads, nCtx)
+            isLoaded = ok
+            ok
+        }
 
     fun unload() {
         if (isLoaded) {
@@ -65,5 +76,5 @@ object LlamaBridge {
         nativeGenerate(prompt, maxTokens, temperature, topP, callback)
         close()
         awaitClose { nativeCancel() }
-    }
+    }.flowOn(Dispatchers.Default)
 }
