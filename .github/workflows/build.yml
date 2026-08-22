@@ -32,6 +32,10 @@ jobs:
           gradle wrapper --gradle-version 8.7
           chmod +x gradlew
 
+      - name: Debug — print llama_sampler_init_penalties declaration
+        run: |
+          grep -n -A 8 "llama_sampler_init_penalties" app/src/main/cpp/llama.cpp/include/llama.h
+
       - name: Build release APK
         env:
           HF_MANIFEST_URL: ${{ secrets.HF_MANIFEST_URL }}
