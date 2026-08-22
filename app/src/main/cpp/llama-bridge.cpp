@@ -132,9 +132,21 @@ Java_com_tdpl_chat_jni_LlamaBridge_nativeGenerate(
     // generation loop on identical phrases and drift into raw pretraining
     // artifacts (e.g. "KHTML" from web-crawl user-agent strings) once it lost
     // the thread of the conversation instead of stopping cleanly.
+    //
+    // NOTE ON SIGNATURE: this llama.cpp checkout's llama_sampler_init_penalties
+    // takes 5 args, not the 4-arg (penalty_last_n, repeat, freq, present) form
+    // documented on llama.cpp's master branch at the time this was written.
+    // Following the same modernization pattern already used by
+    // llama_sampler_init_dry() in this header (vocab as the first argument,
+    // presumably so the sampler can automatically exempt EOG tokens from the
+    // penalty), this passes `vocab` first. If this guess is wrong, the build
+    // log's compiler error will show the real declaration at llama.h:1445 —
+    // paste that back and the call below can be corrected exactly instead of
+    // guessed.
     llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
     llama_sampler *sampler = llama_sampler_chain_init(sparams);
     llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+        vocab,
         /* penalty_last_n */ 256,
         /* penalty_repeat */ 1.15f,
         /* penalty_freq   */ 0.05f,
