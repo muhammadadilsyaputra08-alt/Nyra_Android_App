@@ -156,6 +156,19 @@ Java_com_tdpl_chat_jni_LlamaBridge_nativeGenerate(
     jclass cbClass = env->GetObjectClass(callback);
     jmethodID onToken = env->GetMethodID(cbClass, "onToken", "(Ljava/lang/String;)Z");
 
+    // Explicit stop-string safety net, independent of the native EOG check.
+    // If the GGUF's stop-token metadata is wrong or incomplete (a known
+    // Unsloth-export gotcha), llama_vocab_is_eog() below can simply never
+    // fire, and the model keeps generating straight through where it should
+    // stop — drifting into a hallucinated next turn (literal "assistant",
+    // "User:", chat-template markers leaking into the text). This scans the
+    // running output for those markers and cuts generation the moment one
+    // starts to appear, even if it's split across multiple token pieces.
+    static const char *STOP_STRINGS[] = {
+        "<|im_start|>", "<|im_end|>", "\nUser:", "\nAssistant:", "\nuser:", "\nassistant:"
+    };
+
+    std::string fullOutput;
     int nCur = nTokens;
     for (int i = 0; i < maxTokens && !g_cancel.load(); i++) {
         llama_token newToken = llama_sampler_sample(sampler, g_ctx, -1);
@@ -165,6 +178,31 @@ Java_com_tdpl_chat_jni_LlamaBridge_nativeGenerate(
         char buf[256];
         int len = llama_token_to_piece(vocab, newToken, buf, sizeof(buf), 0, true);
         std::string piece(buf, len);
+        fullOutput += piece;
+
+        // Check whether any stop marker has started appearing in the output
+        // so far. If found, only forward the clean portion before it.
+        size_t stopPos = std::string::npos;
+        for (const char *stopStr : STOP_STRINGS) {
+            size_t pos = fullOutput.find(stopStr);
+            if (pos != std::string::npos && (stopPos == std::string::npos || pos < stopPos)) {
+                stopPos = pos;
+            }
+        }
+
+        if (stopPos != std::string::npos) {
+            // Only send the clean prefix of *this* piece, then stop for good.
+            size_t alreadySentLen = fullOutput.size() - piece.size();
+            if (stopPos > alreadySentLen) {
+                std::string cleanTail = fullOutput.substr(alreadySentLen, stopPos - alreadySentLen);
+                if (!cleanTail.empty()) {
+                    jstring jClean = env->NewStringUTF(cleanTail.c_str());
+                    env->CallBooleanMethod(callback, onToken, jClean);
+                    env->DeleteLocalRef(jClean);
+                }
+            }
+            break;
+        }
 
         jstring jPiece = env->NewStringUTF(piece.c_str());
         jboolean keepGoing = env->CallBooleanMethod(callback, onToken, jPiece);
