@@ -126,9 +126,21 @@ Java_com_tdpl_chat_jni_LlamaBridge_nativeGenerate(
         return;
     }
 
-    // Simple sampler chain: temperature + top-p, matching llama.cpp's sampler API.
+    // Sampler chain, in llama.cpp's canonical order: penalties -> top_k ->
+    // top_p -> temperature -> dist. The previous chain had no repetition
+    // penalty at all, which — combined with a lightly fine-tuned model — let
+    // generation loop on identical phrases and drift into raw pretraining
+    // artifacts (e.g. "KHTML" from web-crawl user-agent strings) once it lost
+    // the thread of the conversation instead of stopping cleanly.
     llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
     llama_sampler *sampler = llama_sampler_chain_init(sparams);
+    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+        /* penalty_last_n */ 256,
+        /* penalty_repeat */ 1.15f,
+        /* penalty_freq   */ 0.05f,
+        /* penalty_present*/ 0.05f
+    ));
+    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(topP, 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
